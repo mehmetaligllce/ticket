@@ -1,0 +1,17 @@
+[
+  { "row": "A", "pattern": "AAAAAAAAAAAAAAAAAAAA" },
+  { "row": "B", "pattern": "AAAAAAAAAAAAAAAAAAAA" },
+  { "row": "SPACE"  },
+  { "row": "C", "pattern": "AAAAAAAAAAAAADDDAA" },
+  { "row": "D", "pattern": "AAAAAAAAAAAABBBBBB" },
+  { "row": "E", "pattern": "AAAAAAAAAAAAAAAAAA" },
+  { "row": "F", "pattern": "AAAAAAAAAAAAAAAAAA" },
+  { "row": "G", "pattern": "AAAAAAAAAAAAAAAAAA" },
+  { "row": "H", "pattern": "AAAAAAAAAAAAAAAAAA" },
+  { "row": "I", "pattern": "AAAAAAAAAABBAAAAAA" },
+  { "row": "J", "pattern": "AAAAAAAAAAAAAAAAAA" },
+  { "row": "K", "pattern": "AAAAAAAAAAAAAAAAAA____AA" },
+  { "row": "L", "pattern": "AAAAAAAAAAAAAAAAAA____AA" },
+  { "row": "M", "pattern": "AAAAAAAAAAAAAAAAAA____AA" },
+  { "row": "N", "pattern": "AAAAAAAAAAAAAAAAAAAAAAAA" }
+]
