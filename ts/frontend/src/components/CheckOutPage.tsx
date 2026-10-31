@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const GO_API_URL = import.meta.env.VITE_GO_URL || 'http://localhost:8080';
+
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Route state'inden veya sessionStorage'dan seçilen koltukları al (boşsa varsayılan A1, A2 gösterir)
   const getInitialSeats = (): string[] => {
     if (location.state?.selectedSeats && Array.isArray(location.state.selectedSeats) && location.state.selectedSeats.length > 0) {
       return location.state.selectedSeats;
@@ -24,7 +26,7 @@ export default function CheckoutPage() {
 
   const selectedSeats: string[] = getInitialSeats();
   const seatCount = selectedSeats.length;
-  const seatPrice = 150; // Koltuk başı TL
+  const seatPrice = 250; 
   const subtotal = seatCount * seatPrice;
   const serviceFee = seatCount > 0 ? 15 : 0;
   const totalPrice = subtotal + serviceFee;
@@ -54,23 +56,63 @@ export default function CheckoutPage() {
     setFormData({ ...formData, expiry: val });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    setTimeout(() => {
-      const generatedOrderNo = 'TKT-' + Math.floor(100000 + Math.random() * 900000);
+    try {
+      const storedUser = localStorage.getItem('user');
+      const user = storedUser ? JSON.parse(storedUser) : null;
+
+      const res = await fetch(`${API_URL}/api/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          seats: selectedSeats,
+          user_id: user ? user.id : null,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || 'Ödeme sırasında hata oluştu.');
+        setLoading(false);
+        return;
+      }
+
+      const generatedOrderNo = data.orderNumber || 'TKT-999999';
       setOrderNumber(generatedOrderNo);
-      setLoading(false);
+      sessionStorage.removeItem('selectedSeats');
+
+      try {
+        const userId = user?.id ? String(user.id) : 'guest';
+        for (const seat of selectedSeats) {
+          fetch(`${GO_API_URL}/api/seats/release`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userID: userId, seat, eventID: '1' }),
+          }).catch(() => {});
+        }
+      } catch {
+        //  
+      }
+
       setSuccess(true);
-    }, 1600);
+    } catch (err) {
+      console.error(err);
+      alert('Sunucuya bağlanılamadı.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Kart Markasını Belirle (Visa / Mastercard)
   const getCardBrand = () => {
     const rawNum = formData.cardNumber.replace(/\s/g, '');
     if (rawNum.startsWith('4')) return 'VISA';
     if (rawNum.startsWith('5') || rawNum.startsWith('2')) return 'MASTERCARD';
+    if (rawNum.startsWith('9') ) return 'TROY';
+    
     return '';
   };
 
@@ -80,14 +122,13 @@ export default function CheckoutPage() {
         className="relative w-full min-h-screen bg-cover bg-center bg-no-repeat flex items-center justify-center p-6 text-slate-100 font-sans"
         style={{ backgroundImage: "url('/pexels-pixabay-459225.jpg')" }}
       >
-        {/* Dark Transparent Backdrop Overlay */}
         <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md pointer-events-none" />
 
         <div 
           className="relative z-10 w-full max-w-xl bg-slate-900/90 backdrop-blur-2xl border border-slate-800 rounded-3xl text-center shadow-2xl overflow-hidden my-8"
           style={{ padding: '40px 36px' }}
         >
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-500" />
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-linear-to-r from-emerald-500 to-teal-500" />
           
           <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full flex items-center justify-center text-4xl mx-auto mb-6 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
             ✓
@@ -98,7 +139,6 @@ export default function CheckoutPage() {
             Biletleriniz başarıyla oluşturuldu ve e-posta adresinize gönderildi.
           </p>
 
-          {/* Receipt Info Card */}
           <div 
             className="bg-slate-950/80 border border-slate-800 rounded-2xl text-left mb-6 text-sm"
             style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}
@@ -128,7 +168,7 @@ export default function CheckoutPage() {
 
           <button
             onClick={() => navigate('/')}
-            className="w-full py-4 px-6 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-2xl font-bold text-base transition-all shadow-lg shadow-orange-500/25 cursor-pointer flex items-center justify-center gap-2"
+            className="w-full py-4 px-6 bg-linear-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-2xl font-bold text-base transition-all shadow-lg shadow-orange-500/25 cursor-pointer flex items-center justify-center gap-2"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -146,18 +186,14 @@ export default function CheckoutPage() {
       className="relative w-full min-h-screen bg-cover bg-center bg-no-repeat flex items-center justify-center p-4 sm:p-8 lg:p-12 text-slate-100 font-sans"
       style={{ backgroundImage: "url('/pexels-pixabay-459225.jpg')" }}
     >
-      {/* Dark Transparent Backdrop Overlay */}
       <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md pointer-events-none" />
 
-      {/* Main Wide Card Container */}
       <div 
         className="relative z-10 w-full bg-slate-900/85 backdrop-blur-2xl border border-slate-800 rounded-3xl shadow-2xl overflow-hidden my-6"
         style={{ maxWidth: '1280px', padding: '40px 48px' }}
       >
-        {/* Top Decorative Amber Line */}
-        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600" />
+        <div className="absolute top-0 left-0 right-0 h-1.5 bg-linear-to-r from-orange-500 via-amber-500 to-orange-600" />
 
-        {/* Top Navigation Bar Pill */}
         <div 
           className="bg-slate-950/70 rounded-2xl border border-slate-800/80"
           style={{ padding: '18px 28px', marginBottom: '40px', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}
@@ -182,28 +218,23 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* Main Grid Content */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-stretch">
           
-          {/* LEFT COLUMN: 3D Credit Card & Order Summary */}
           <div 
             className="lg:col-span-5 bg-slate-950/60 rounded-3xl border border-slate-800/80"
             style={{ padding: '32px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '32px' }}
           >
-            {/* REALISTIC 3D CREDIT CARD PREVIEW */}
             <div 
-              className="relative w-full rounded-2xl bg-gradient-to-br from-slate-800 via-slate-900 to-black border border-slate-700/70 shadow-2xl overflow-hidden"
+              className="relative w-full rounded-2xl bg-linear-to-br from-slate-800 via-slate-900 to-black border border-slate-700/70 shadow-2xl overflow-hidden"
               style={{ padding: '28px', minHeight: '230px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
             >
-              {/* Amber Glow Layer */}
-              <div className="absolute -top-12 -right-12 w-48 h-48 bg-gradient-to-br from-orange-500/25 to-amber-500/0 rounded-full blur-2xl pointer-events-none" />
+              <div className="absolute -top-12 -right-12 w-48 h-48 bg-linear-to-br from-orange-500/25 to-amber-500/0 rounded-full blur-2xl pointer-events-none" />
               
-              {/* Card Top Row: Chip & Contactless */}
               <div className="flex justify-between items-center" style={{ marginBottom: '16px' }}>
-                <div className="w-12 h-9 bg-gradient-to-tr from-amber-400 to-yellow-200 rounded-md border border-yellow-300/40 relative overflow-hidden flex items-center justify-center shadow-inner">
-                  <div className="w-full h-[1px] bg-slate-800/40 absolute top-3" />
-                  <div className="w-full h-[1px] bg-slate-800/40 absolute bottom-3" />
-                  <div className="h-full w-[1px] bg-slate-800/40 absolute left-4" />
+                <div className="w-12 h-9 bg-linear-to-tr from-amber-400 to-yellow-200 rounded-md border border-yellow-300/40 relative overflow-hidden flex items-center justify-center shadow-inner">
+                  <div className="w-full h-px bg-slate-800/40 absolute top-3" />
+                  <div className="w-full h-px bg-slate-800/40 absolute bottom-3" />
+                  <div className="h-full w-px bg-slate-800/40 absolute left-4" />
                 </div>
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-slate-400 opacity-80">
                   <path d="M8.5 14.5A5 5 0 0 0 15.5 14.5" />
@@ -212,7 +243,6 @@ export default function CheckoutPage() {
                 </svg>
               </div>
 
-              {/* Card Number */}
               <div 
                 className="font-mono text-xl sm:text-2xl tracking-widest text-slate-100 font-bold drop-shadow flex items-center"
                 style={{ margin: '16px 0', minHeight: '36px', padding: '0 4px' }}
@@ -220,29 +250,27 @@ export default function CheckoutPage() {
                 {formData.cardNumber || ''}
               </div>
 
-              {/* Card Bottom Row: Name, Expiry & Brand */}
               <div className="flex justify-between items-end text-xs sm:text-sm" style={{ padding: '0 4px' }}>
                 <div className="min-w-0 flex-1 mr-3">
                   <div className="text-[10px] uppercase text-slate-400 font-semibold tracking-wider mb-1">KART SAHİBİ</div>
-                  <div className="font-medium text-slate-100 uppercase tracking-wide truncate min-h-[20px]">
+                  <div className="font-medium text-slate-100 uppercase tracking-wide truncate min-h-5">
                     {formData.cardName || ''}
                   </div>
                 </div>
 
                 <div className="mr-4">
                   <div className="text-[10px] uppercase text-slate-400 font-semibold tracking-wider mb-1">SKT</div>
-                  <div className="font-mono font-medium text-slate-100 min-h-[20px]">
+                  <div className="font-mono font-medium text-slate-100 min-h-5">
                     {formData.expiry || ''}
                   </div>
                 </div>
 
-                <div className="font-bold italic text-amber-400 text-sm sm:text-base tracking-tighter min-w-[50px] text-right">
+                <div className="font-bold italic text-amber-400 text-sm sm:text-base tracking-tighter min-w-12.5 text-right">
                   {getCardBrand()}
                 </div>
               </div>
             </div>
 
-            {/* ORDER SUMMARY */}
             <div 
               className="bg-slate-950/80 border border-slate-800/90 rounded-2xl"
               style={{ padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px' }}
@@ -254,7 +282,6 @@ export default function CheckoutPage() {
                 </span>
               </h4>
 
-              {/* DETAILED ITEMISED SEATS BADGES */}
               <div className="py-1">
                 <span className="text-slate-400 text-xs font-semibold block mb-2">Seçilen Koltuk Listesi:</span>
                 <div className="flex flex-wrap gap-2">
@@ -283,7 +310,7 @@ export default function CheckoutPage() {
 
               <div className="pt-4 border-t border-slate-800 flex justify-between items-center">
                 <span className="text-base font-bold text-white">Toplam Ödenecek:</span>
-                <span className="text-2xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-400">
+                <span className="text-2xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-linear-to-r from-orange-400 to-amber-400">
                   ₺{totalPrice.toLocaleString('tr-TR')},00
                 </span>
               </div>
@@ -291,7 +318,6 @@ export default function CheckoutPage() {
 
           </div>
 
-          {/* RIGHT COLUMN: PAYMENT FORM */}
           <div 
             className="lg:col-span-7 bg-slate-950/60 rounded-3xl border border-slate-800/80"
             style={{ padding: '36px 40px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}
@@ -300,7 +326,6 @@ export default function CheckoutPage() {
             <p className="text-sm text-slate-400 mb-8">Lütfen ödemeyi tamamlamak için kart bilgilerinizi giriniz.</p>
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '28px', width: '100%' }}>
-              {/* Cardholder Name */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <label className="text-xs sm:text-sm font-bold text-slate-300 uppercase tracking-wider block">
                   Kart Üzerindeki İsim
@@ -324,7 +349,6 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Card Number */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <label className="text-xs sm:text-sm font-bold text-slate-300 uppercase tracking-wider block">
                   Kart Numarası
@@ -349,7 +373,6 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Expiry & CVV */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <label className="text-xs sm:text-sm font-bold text-slate-300 uppercase tracking-wider block">
@@ -403,12 +426,11 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* SUBMIT BUTTON */}
               <button
                 type="submit"
                 disabled={loading}
                 style={{ marginTop: '16px', padding: '20px 32px', fontSize: '18px' }}
-                className="w-full bg-gradient-to-r from-orange-600 via-amber-600 to-orange-500 hover:from-orange-500 hover:to-amber-500 text-white rounded-2xl font-extrabold transition-all shadow-xl shadow-orange-500/25 flex items-center justify-center gap-3 cursor-pointer disabled:opacity-75"
+                className="w-full bg-linear-to-r from-orange-600 via-amber-600 to-orange-500 hover:from-orange-500 hover:to-amber-500 text-white rounded-2xl font-extrabold transition-all shadow-xl shadow-orange-500/25 flex items-center justify-center gap-3 cursor-pointer disabled:opacity-75"
               >
                 {loading ? (
                   <span className="flex items-center gap-3">

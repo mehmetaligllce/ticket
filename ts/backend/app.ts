@@ -9,15 +9,17 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Veritabanını başlat
 initDb();
 
+app.get("/api/health", (_req: Request, res: Response) => {
+  res.status(200).json({ status: "ok" });
+});
+
 // ----------------------------------------------------
-// KAYIT OL (REGISTER) ENDPOINT
+// REGISTER ENDPOINT
 // ----------------------------------------------------
 app.post("/api/register", async (req: Request, res: Response): Promise<void> => {
   const { email, password, name } = req.body;
@@ -28,18 +30,15 @@ app.post("/api/register", async (req: Request, res: Response): Promise<void> => 
   }
 
   try {
-    // 1. Kullanıcı zaten var mı kontrol et
     const userExist = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
     if (userExist.rows.length > 0) {
       res.status(400).json({ error: "Bu email adresi zaten kayıtlı." });
       return;
     }
 
-    // 2. Şifreyi hashle
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // 3. Kullanıcıyı PostgreSQL'e kaydet
     const newUser = await pool.query(
       "INSERT INTO users (email, password, name) VALUES ($1, $2, $3) RETURNING id, email, name, created_at",
       [email, hashedPassword, name || null]
@@ -56,7 +55,7 @@ app.post("/api/register", async (req: Request, res: Response): Promise<void> => 
 });
 
 // ----------------------------------------------------
-// GİRİŞ YAP (LOGIN) ENDPOINT
+// LOGIN ENDPOINT
 // ----------------------------------------------------
 app.post("/api/login", async (req: Request, res: Response): Promise<void> => {
   const { email, password } = req.body;
@@ -67,7 +66,6 @@ app.post("/api/login", async (req: Request, res: Response): Promise<void> => {
   }
 
   try {
-    // 1. Kullanıcıyı veritabanında ara
     const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
     if (result.rows.length === 0) {
       res.status(400).json({ error: "Kullanıcı bulunamadı veya şifre hatalı." });
@@ -76,14 +74,12 @@ app.post("/api/login", async (req: Request, res: Response): Promise<void> => {
 
     const user = result.rows[0];
 
-    // 2. Şifreyi doğrula
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       res.status(400).json({ error: "Kullanıcı bulunamadı veya şifre hatalı." });
       return;
     }
 
-    // 3. Başarılı yanıt dön (İsteğe göre JWT token eklenebilir)
     res.json({
       message: "Giriş başarılı!",
       user: {
@@ -99,7 +95,67 @@ app.post("/api/login", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// Sunucuyu Başlat
 app.listen(PORT, () => {
   console.log(`🚀 Backend sunucusu çalışıyor: http://localhost:${PORT}`);
 });
+
+
+
+
+// ----------------------------------------------------
+// ORDERS ENDPOINT
+// ----------------------------------------------------
+app.post("/api/checkout", async (req: Request, res: Response) => {
+  const { seats } = req.body;
+
+  if (!seats) {
+    res.status(400).json({ error: "Koltuk seçilmedi." });
+    return;
+  }
+
+  try {
+
+    const successOrders=[]
+    for(const seat of seats){
+      const isAlreadyTaken=await pool.query("SELECT 1 FROM orders WHERE seat=$1 ",[seat]);
+      if(isAlreadyTaken.rows.length>0){
+        res.status(400).json({error:"Bu koltuk zaten alınmış!"})
+        return;
+      }
+      const newOrder=await pool.query("INSERT INTO orders (user_id,seat) VALUES ($1,$2) RETURNING id,user_id,seat,created_at",[req.body.user_id,seat || null])
+      successOrders.push(newOrder.rows[0])
+    }
+   
+
+    const generatedOrderNo = "TKT-" + Math.floor(100000 + Math.random() * 900000);
+
+    res.status(201).json({
+      message: "Sipariş başarılı!",
+      orderNumber: generatedOrderNo,
+      order: successOrders,
+    });
+  } catch (err) {
+    console.error("Sipariş hatası:", err);
+    res.status(500).json({ error: "Sunucu hatası oluştu." });
+  }
+});
+
+app.get("/api/order/:seatId", async(req: Request, res: Response)=> {
+
+  const seatId= req.params.seatId;
+  const isTaken= await pool.query("SELECT * FROM orders WHERE seat=$1",[seatId])
+  if(isTaken.rows.length>0){
+    res.status(400).json({error:"Bu koltuk zaten alınmıştır",taken:true})
+  }
+  else{
+    res.status(200).json({message:"Bu koltuk boştur",taken:false});
+  }
+
+})
+
+
+app.get("/api/orders", async(req: Request, res: Response)=> {
+  const allOrders=await pool.query("SELECT seat FROM orders ")
+  res.status(200).json(allOrders.rows)
+
+})

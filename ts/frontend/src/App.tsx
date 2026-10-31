@@ -1,23 +1,65 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
-import TicketSelectPage from './components/ticketSelectPage'
+import TicketSelectPage from './components/TicketSelectPage'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 function App() {
+  const [serverReady, setServerReady] = useState(false)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
+
+  const storedUser = localStorage.getItem('user');
+  const initialUser = storedUser ? JSON.parse(storedUser) : null;
+
   
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [user, setUser] = useState<{ id: number; name?: string; email: string; created_at?: string } | null>(null)
+  const [user, setUser] = useState<{ id: number; name?: string; email: string; created_at?: string } | null>(initialUser);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const timer = setInterval(() => {
+      if (isMounted) {
+        setElapsedSeconds((prev) => prev + 1);
+      }
+    }, 1000);
+
+    const checkServer = async () => {
+      while (isMounted) {
+        try {
+          const res = await fetch(`${API_URL}/api/orders`, { method: 'GET' });
+          if (res.ok || res.status < 500) {
+            if (isMounted) {
+              setServerReady(true);
+            }
+            break;
+          }
+        } catch {
+          // 
+        }
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+      }
+    };
+
+    checkServer();
+
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setMessage(null)
     setLoading(true)
 
-    const endpoint = isLogin ? 'http://localhost:5000/api/login' : 'http://localhost:5000/api/register'
+    const endpoint = isLogin ? `${API_URL}/api/login` : `${API_URL}/api/register`
     const payload = isLogin ? { email, password } : { email, password, name }
 
     try {
@@ -35,6 +77,7 @@ function App() {
 
       setMessage({ type: 'success', text: data.message })
       setUser(data.user)
+      localStorage.setItem('user', JSON.stringify(data.user))
     } catch (err: unknown) {
       setMessage({ type: 'error', text: (err as Error).message || 'Sunucuya bağlanılamadı.' })
     } finally {
@@ -44,18 +87,39 @@ function App() {
   }
 
   const handleLogout = () => {
-    setUser(null)
-    setEmail('')
-    setPassword('')
-    setName('')
-    setMessage(null)
+    localStorage.removeItem('user');
+    setUser(null);
+    setEmail('');
+    setPassword('');
+    setName('');
+    setMessage(null);
+  };
+
+  if (!serverReady) {
+    return (
+      <div className="app-container" style={{ width: '100%', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <div className="auth-wrapper" style={{ textAlign: 'center', padding: '44px 32px', maxWidth: '460px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+            <div className="spinner" style={{ width: '48px', height: '48px', borderWidth: '4px', borderColor: 'rgba(249, 115, 22, 0.25)', borderTopColor: '#f97316' }} />
+          </div>
+          <h2 className="auth-title" style={{ fontSize: '22px', marginBottom: '12px' }}>
+            Backend Sunucusu Ayağa Kalkıyor...
+          </h2>
+          <p className="auth-subtitle" style={{ fontSize: '14px', lineHeight: '1.6', color: '#cbd5e1', marginBottom: '20px' }}>
+            Ücretsiz bulut sunucusu uyku modundan uyandırılıyor. Bu işlem <b>30 - 40 saniye</b> sürebilir, lütfen bekleyiniz.
+          </p>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '999px', background: 'rgba(249, 115, 22, 0.12)', border: '1px solid rgba(249, 115, 22, 0.3)', color: '#fb923c', fontSize: '13px', fontWeight: 600 }}>
+            <span>Geçen Süre: {elapsedSeconds} sn</span>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="app-container" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
       {user ? (
         <div className="ticket-page-wrapper" style={{ width: '100%', maxWidth: '1000px', margin: '0 auto', padding: '20px' }}>
-          {/* Çıkış Yap Barı */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', padding: '14px 20px', background: 'rgba(17, 24, 39, 0.85)', backdropFilter: 'blur(16px)', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #f97316, #ea580c)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#fff' }}>
@@ -71,12 +135,10 @@ function App() {
             </button>
           </div>
 
-          {/* Koltuk Seçim Sayfası */}
           <TicketSelectPage />
         </div>
       ) : (
         <div className="auth-wrapper">
-          {/* Header */}
           <div className="auth-header">
             <div className="brand-icon">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -91,7 +153,6 @@ function App() {
             </p>
           </div>
 
-          {/* Segmented Control Tabs */}
           <div className="tab-switcher">
             <button
               type="button"
@@ -109,7 +170,6 @@ function App() {
             </button>
           </div>
 
-          {/* Alert Message */}
           {message && (
             <div className={`alert-banner ${message.type}`}>
               {message.type === 'success' ? (
@@ -121,7 +181,6 @@ function App() {
             </div>
           )}
 
-          {/* Form */}
           <form className="auth-form" onSubmit={handleSubmit}>
             {!isLogin && (
               <div className="form-group">
@@ -130,7 +189,7 @@ function App() {
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="Mehmet Yılmaz"
+                    placeholder="Mehmet"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                   />

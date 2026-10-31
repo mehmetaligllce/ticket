@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "tsx watch src/app.ts"
+    "dev": "tsx watch app.ts",
+    "start": "tsx app.ts"
   },
   "keywords": [],
   "author": "",
@@ -15,14 +16,14 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "pg": "^8.23.0"
+    "pg": "^8.23.0",
+    "tsx": "^4.23.13"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^26.4.0",
-    "@types/pg": "^8.23.1",
-    "tsx": "^4.23.13"
+    "@types/pg": "^8.23.1"
   }
 }
