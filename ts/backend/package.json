@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch app.ts",
-    "start": "tsx app.ts"
+    "start": "node --import tsx app.ts"
   },
   "keywords": [],
   "author": "",
