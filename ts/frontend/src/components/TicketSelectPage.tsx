@@ -176,7 +176,7 @@ const TicketSelectPage = () => {
         <div className="mt-8 px-6 py-3.5 bg-linear-to-r from-orange-600 to-amber-600 text-white rounded-2xl shadow-lg shadow-orange-500/20 text-sm flex items-center gap-4 animate-bounce-short">
           <span>Seçilen Koltuklar: <b className="text-amber-100">{selectedSeats.join(', ')}</b></span>
           <span className="bg-slate-950/40 backdrop-blur-md text-amber-300 font-bold px-3 py-1 rounded-xl text-xs border border-amber-500/30">
-            {selectedSeats.length * 150} TL
+            {selectedSeats.length * 250} TL
           </span>
         </div>
       )}

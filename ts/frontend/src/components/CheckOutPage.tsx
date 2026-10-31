@@ -289,7 +289,7 @@ export default function CheckoutPage() {
                     selectedSeats.map((seat) => (
                       <span key={seat} className="bg-amber-500/15 text-amber-300 font-bold px-3 py-1.5 rounded-xl border border-amber-500/30 text-xs flex items-center gap-1.5 shadow-sm">
                         <span>💺 {seat}</span>
-                        <span className="text-slate-400 font-normal">₺150</span>
+                        <span className="text-slate-400 font-normal">₺250</span>
                       </span>
                     ))
                   ) : (
@@ -299,7 +299,7 @@ export default function CheckoutPage() {
               </div>
 
               <div className="flex justify-between items-center text-sm py-1 border-t border-slate-800/60 pt-3">
-                <span className="text-slate-400">Bilet Tutarı ({seatCount} x ₺150):</span>
+                <span className="text-slate-400">Bilet Tutarı ({seatCount} x ₺250):</span>
                 <span className="font-semibold text-slate-200">₺{subtotal.toLocaleString('tr-TR')},00</span>
               </div>
 
